@@ -1,7 +1,38 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Plus, Calendar, FileText, Check, DollarSign, Printer, Search, Folder, ChevronDown, ChevronRight, ChevronLeft, Save, Trash2, X, Edit, AlertCircle, Eye, EyeOff, Download, MapPin, Clock, Filter, Menu, ArrowDown, BarChart3, TrendingUp, PieChart, Upload, FileJson, UploadCloud, Loader2, Cloud } from 'lucide-react';
 
-// === GOOGLE API CONFIG ===
+// === FIREBASE IMPORTS ===
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  orderBy 
+} from "firebase/firestore";
+
+// === FIREBASE CONFIGURATION (User Provided) ===
+const firebaseConfig = {
+  apiKey: "AIzaSyChK75njpy0zmk3wPfq0vnlORfTVFPkxAo",
+  authDomain: "xiabenhow-quote.firebaseapp.com",
+  projectId: "xiabenhow-quote",
+  storageBucket: "xiabenhow-quote.firebasestorage.app",
+  messagingSenderId: "572897867092",
+  appId: "1:572897867092:web:0be379e659e1a0613544c1",
+  measurementId: "G-H4CTY88LLF"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
+// === GOOGLE API CONFIG (保留備份功能選項) ===
 const CLIENT_ID = '403492971010-sql8j512te6mftdbcuqrigvgqh4fuvnn.apps.googleusercontent.com';
 const API_KEY = null;
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
@@ -12,7 +43,7 @@ const INPUT_CLASS = "w-full border border-gray-300 rounded px-3 py-2 focus:outli
 const LABEL_CLASS = "block text-sm font-bold text-gray-700 mb-1";
 const SECTION_CLASS = "bg-white p-6 rounded-lg shadow-sm border border-gray-200";
 
-// --- DATA MODELS ---
+// --- DATA MODELS (與規格書一致) ---
 const COURSE_DATA = {
     "水晶系列": [
         { name: "手作輕寶石水晶手鍊", price: 980 },
@@ -1058,11 +1089,10 @@ const CalendarView = ({ quotes }) => {
     );
 };
 
-const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChange, onExport, onCreate, onImportBackup, onExportBackup, onCloudSave, isCloudSaving }) => {
+const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChange, onExport, onCreate }) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const importRef = useRef(null);
 
     const groupedQuotes = useMemo(() => {
         const groups = {};
@@ -1077,87 +1107,33 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
 
     const filteredMonths = Object.keys(groupedQuotes).sort().reverse().filter(m => !monthFilter || m === monthFilter);
 
-    const handleImportClick = () => {
-        if (confirm("警告：還原資料將會覆蓋您目前的所有報價單數據。確定要繼續嗎？")) {
-            importRef.current.click();
-        }
-    };
-
     return (
         <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <h2 className="text-2xl font-bold text-gray-800">報價單管理 ({quotes.length} 筆資料)</h2>
                 <div className="flex gap-2 flex-wrap">
-                     <button onClick={onExport} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium text-sm">
+                      <button onClick={onExport} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium text-sm">
                         <FileText className="w-4 h-4 mr-2"/> 匯出報表 (CSV)
-                     </button>
-                     <button onClick={onExportBackup} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium text-sm">
-                        <Download className="w-4 h-4 mr-2"/> 備份資料 (JSON)
-                     </button>
-                     <button onClick={handleImportClick} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium text-sm">
-                        <Upload className="w-4 h-4 mr-2"/> 還原資料 (JSON)
-                     </button>
-                     <input type="file" ref={importRef} onChange={onImportBackup} className="hidden" accept=".json" />
-                     <button onClick={onCreate} className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm">新增</button>
+                      </button>
+                      <button onClick={onCreate} className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm">新增</button>
                 </div>
             </div>
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm mb-6 flex justify-between items-center flex-wrap gap-4">
-                <div className="text-purple-900">
-                    <h3 className="font-bold flex items-center text-lg">
-                        <Cloud className="w-5 h-5 mr-2" />
-                        雲端同步備份 (Google Drive)
-                    </h3>
-                    <p className="text-sm mt-1">點擊將當前所有資料備份到您的 Google Drive 帳號中。</p>
-                </div>
-                <button 
-                    onClick={onCloudSave}
-                    disabled={isCloudSaving}
-                    className="flex items-center px-6 py-2 bg-purple-600 text-white text-base font-medium rounded-md hover:bg-purple-700 transition duration-150 disabled:bg-purple-400 disabled:cursor-not-allowed"
-                >
-                    {isCloudSaving ? (
-                        <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            儲存中...
-                        </>
-                    ) : (
-                        <>
-                            <UploadCloud className="w-5 h-5 mr-2" />
-                            一鍵備份至雲端
-                        </>
-                    )}
-                </button>
-            </div>
+            
             <div className={SECTION_CLASS + " mb-6 flex flex-col md:flex-row gap-4 items-center"}>
                  <div className="relative flex-1 w-full">
                     <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5"/>
-                    <input
-                        type="text"
-                        placeholder="搜尋客戶名稱、電話..."
-                        className={INPUT_CLASS + " pl-10"}
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
+                    <input type="text" placeholder="搜尋客戶名稱、電話..." className={INPUT_CLASS + " pl-10"} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                  </div>
                  <div className="flex items-center gap-2 w-full md:w-auto">
                     <span className="text-sm text-gray-500 whitespace-nowrap min-w-[3rem]">月份:</span>
-                    <select
-                        className={INPUT_CLASS + " md:w-40"}
-                        value={monthFilter}
-                        onChange={e => setMonthFilter(e.target.value)}
-                    >
+                    <select className={INPUT_CLASS + " md:w-40"} value={monthFilter} onChange={e => setMonthFilter(e.target.value)}>
                          <option value="">全部月份</option>
-                         {Object.keys(groupedQuotes).sort().reverse().map(m => (
-                            <option key={m} value={m}>{m}</option>
-                         ))}
+                         {Object.keys(groupedQuotes).sort().reverse().map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                  </div>
                  <div className="flex items-center gap-2 w-full md:w-auto">
                     <span className="text-sm text-gray-500 whitespace-nowrap min-w-[3rem]">狀態:</span>
-                    <select
-                        className={INPUT_CLASS + " md:w-40"}
-                        value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value)}
-                    >
+                    <select className={INPUT_CLASS + " md:w-40"} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                          <option value="all">全部狀態</option>
                          <option value="draft">草稿</option>
                          <option value="pending">報價中</option>
@@ -1175,55 +1151,36 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
                         const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
                         return matchesSearch && matchesStatus;
                     });
-
                     if (monthQuotes.length === 0) return null;
-
                     return (
                         <div key={month} className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
                              <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center font-semibold text-gray-700">
-                                <Folder className="w-5 h-5 mr-2 text-yellow-500" />
-                                {month} ({monthQuotes.length})
+                                <Folder className="w-5 h-5 mr-2 text-yellow-500" /> {month} ({monthQuotes.length})
                              </div>
                              <div className="divide-y divide-gray-100">
                                 {monthQuotes.map(quote => (
                                     <div key={quote.id} className="p-4 hover:bg-blue-50 transition flex flex-col md:flex-row justify-between items-center gap-4">
                                          <div className="flex-1 min-w-0">
-                                             <div className="flex items-center gap-3 mb-1 flex-wrap">
-                                                 <StatusSelector
-                                                     status={quote.status}
-                                                     onChange={(val) => onStatusChange(quote.id, val)}
-                                                 />
+                                              <div className="flex items-center gap-3 mb-1 flex-wrap">
+                                                 <StatusSelector status={quote.status} onChange={(val) => onStatusChange(quote.id, val)} />
                                                  <span className="font-bold text-lg text-gray-900 truncate">{quote.clientInfo.companyName}</span>
                                                  <span className="text-xs text-gray-400 font-mono">#{quote.id.slice(-4)}</span>
-                                             </div>
-                                             <div className="text-sm text-gray-600 truncate">
+                                              </div>
+                                              <div className="text-sm text-gray-600 truncate">
                                                  <span className="mr-3">聯絡人: {quote.clientInfo.contactPerson}</span>
                                                  <span>課程: {quote.items[0]?.courseName} {quote.items.length > 1 ? `(+${quote.items.length - 1})` : ''}</span>
-                                             </div>
-                                             <div className="text-xs text-gray-400 mt-1">
-                                                 建立於: {formatDate(quote.createdAt)}
-                                             </div>
+                                              </div>
                                          </div>
                                          <div className="flex flex-col items-end gap-2 min-w-[150px]">
-                                             <div className="text-xl font-bold text-blue-600">
-                                                 ${quote.totalAmount?.toLocaleString()}
-                                             </div>
-                                             <div className="flex gap-2">
-                                                 <button onClick={() => onPreview(quote)} className="p-2 text-blue-600 hover:bg-blue-100 rounded tooltip transition-colors" title="預覽報價單">
-                                                     <Eye className="w-5 h-5"/>
-                                                 </button>
+                                              <div className="text-xl font-bold text-blue-600">${quote.totalAmount?.toLocaleString()}</div>
+                                              <div className="flex gap-2">
+                                                 <button onClick={() => onPreview(quote)} className="p-2 text-blue-600 hover:bg-blue-100 rounded tooltip transition-colors"><Eye className="w-5 h-5"/></button>
                                                  {['confirmed', 'paid', 'closed'].includes(quote.status) && (
-                                                     <button onClick={() => onPayment(quote)} className="p-2 text-orange-600 hover:bg-orange-100 rounded tooltip transition-colors" title="款項管理">
-                                                         <DollarSign className="w-5 h-5"/>
-                                                     </button>
+                                                     <button onClick={() => onPayment(quote)} className="p-2 text-orange-600 hover:bg-orange-100 rounded tooltip transition-colors"><DollarSign className="w-5 h-5"/></button>
                                                  )}
-                                                 <button onClick={() => onEdit(quote)} className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors" title="編輯">
-                                                     <Edit className="w-5 h-5"/>
-                                                 </button>
-                                                 <button onClick={() => onDelete(quote.id)} className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors" title="刪除">
-                                                     <Trash2 className="w-5 h-5"/>
-                                                 </button>
-                                             </div>
+                                                 <button onClick={() => onEdit(quote)} className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"><Edit className="w-5 h-5"/></button>
+                                                 <button onClick={() => onDelete(quote.id)} className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"><Trash2 className="w-5 h-5"/></button>
+                                              </div>
                                          </div>
                                     </div>
                                 ))}
@@ -1236,7 +1193,9 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
     );
 };
 
+// === 重構後的 QuoteCreator ===
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
+    // 基本資訊
     const [clientInfo, setClientInfo] = useState(initialData?.clientInfo || {
         companyName: '', taxId: '', contactPerson: '', phone: '', email: '', address: ''
     });
@@ -1244,7 +1203,11 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     const [dueDate, setDueDate] = useState(initialData?.paymentDueDate || '');
     const [adminNotes, setAdminNotes] = useState(initialData?.adminNotes || '');
 
-    const [items, setItems] = useState(initialData?.items || [{
+    // 已加入的課程列表 (Fixed Items)
+    const [addedItems, setAddedItems] = useState(initialData?.items || []);
+
+    // 正在編輯的課程 (Pending Item Form State)
+    const defaultPendingItem = {
         id: Date.now(),
         courseSeries: '水晶系列',
         courseName: '手作輕寶石水晶手鍊',
@@ -1264,63 +1227,69 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         extraFeeDesc: '',
         address: '',
         itemNote: ''
-    }]);
+    };
+    const [pendingItem, setPendingItem] = useState(defaultPendingItem);
 
-    const calculatedItems = useMemo(() => {
-        return items.map(item => ({
-            ...item,
-            calc: calculateItem(item)
-        }));
-    }, [items]);
+    // 計算 "已加入" 的項目總額
+    const totalAmount = useMemo(() => {
+        return addedItems.reduce((sum, item) => sum + (item.calc.finalTotal || 0), 0);
+    }, [addedItems]);
 
-    const totalAmount = calculatedItems.reduce((sum, item) => sum + (item.calc.finalTotal || 0), 0);
-
-    const updateItem = (index, field, value) => {
-        const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value };
+    // 更新 Pending Item 的欄位
+    const updatePendingItem = (field, value) => {
+        const newItem = { ...pendingItem, [field]: value };
         
         if (field === 'courseName') {
-            const series = COURSE_DATA[newItems[index].courseSeries];
+            const series = COURSE_DATA[newItem.courseSeries];
             const course = series.find(c => c.name === value);
-            if (course) newItems[index].price = course.price;
+            if (course) newItem.price = course.price;
         }
         if (field === 'courseSeries') {
             const series = COURSE_DATA[value];
             if(series && series.length > 0) {
-                newItems[index].courseName = series[0].name;
-                newItems[index].price = series[0].price;
+                newItem.courseName = series[0].name;
+                newItem.price = series[0].price;
             }
         }
         if (field === 'outingRegion') {
             const available = getAvailableCities(value);
-            newItems[index].city = available[0] || '';
-            newItems[index].area = '';
+            newItem.city = available[0] || '';
+            newItem.area = '';
         }
         if (field === 'city') {
-            newItems[index].area = '';
+            newItem.area = '';
         }
-
-        setItems(newItems);
+        setPendingItem(newItem);
     };
 
-    const addItem = () => {
-        setItems([...items, { ...items[items.length-1], id: Date.now(), itemNote: '' }]);
+    // 執行加入動作
+    const handleAddItem = () => {
+        // 先計算
+        const calculated = calculateItem(pendingItem);
+        if (calculated.error) {
+            alert(`無法加入：${calculated.error}`);
+            return;
+        }
+        // 加入列表
+        setAddedItems([...addedItems, { ...pendingItem, id: Date.now(), calc: calculated }]);
+        // 重置表單 (保留部分設定如日期地點可能比較方便，這裡選擇重置回預設但保留部分邏輯)
+        setPendingItem({ ...defaultPendingItem, id: Date.now() + 1 });
     };
 
-    const removeItem = (index) => {
-        setItems(items.filter((_, i) => i !== index));
+    const removeAddedItem = (index) => {
+        const newItems = [...addedItems];
+        newItems.splice(index, 1);
+        setAddedItems(newItems);
     };
 
     const handleSave = () => {
-        const hasError = calculatedItems.some(i => i.calc.error);
-        if (hasError) {
-            alert("報價單中有項目不符合規則，請修正後再儲存。");
+        if (addedItems.length === 0) {
+            alert("請至少加入一項課程");
             return;
         }
-
         onSave({
             clientInfo,
-            items: calculatedItems,
+            items: addedItems,
             totalAmount,
             status,
             paymentDueDate: dueDate,
@@ -1328,253 +1297,188 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         });
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
+    // 即時計算 Pending Item 的費用預覽 (僅供顯示)
+    const pendingCalc = calculateItem(pendingItem);
 
     return (
         <div className="flex flex-col gap-8 max-w-5xl mx-auto p-4 md:p-8 relative print:block print:w-full print:h-auto">
+            {/* 客戶資料區塊 */}
             <div className="print:hidden">
                 <section className={SECTION_CLASS}>
                     <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center">
                         <div className="w-1 h-6 bg-slate-800 mr-2 rounded"></div>
-                        客戶基本資料 (報價單抬頭)
+                        客戶基本資料
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className={LABEL_CLASS}>公司/客戶名稱</label>
-                            <input className={INPUT_CLASS} placeholder="請輸入名稱" value={clientInfo.companyName} onChange={e => setClientInfo({...clientInfo, companyName: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>統一編號</label>
-                            <input className={INPUT_CLASS} placeholder="選填" value={clientInfo.taxId} onChange={e => setClientInfo({...clientInfo, taxId: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>聯絡人</label>
-                            <input className={INPUT_CLASS} placeholder="請輸入聯絡人" value={clientInfo.contactPerson} onChange={e => setClientInfo({...clientInfo, contactPerson: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>電話</label>
-                            <input className={INPUT_CLASS} placeholder="請輸入電話" value={clientInfo.phone} onChange={e => setClientInfo({...clientInfo, phone: e.target.value})} />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className={LABEL_CLASS}>電子信箱</label>
-                            <input className={INPUT_CLASS} placeholder="選填" value={clientInfo.email} onChange={e => setClientInfo({...clientInfo, email: e.target.value})} />
-                        </div>
+                        <div><label className={LABEL_CLASS}>公司/客戶名稱</label><input className={INPUT_CLASS} value={clientInfo.companyName} onChange={e => setClientInfo({...clientInfo, companyName: e.target.value})} /></div>
+                        <div><label className={LABEL_CLASS}>統一編號</label><input className={INPUT_CLASS} value={clientInfo.taxId} onChange={e => setClientInfo({...clientInfo, taxId: e.target.value})} /></div>
+                        <div><label className={LABEL_CLASS}>聯絡人</label><input className={INPUT_CLASS} value={clientInfo.contactPerson} onChange={e => setClientInfo({...clientInfo, contactPerson: e.target.value})} /></div>
+                        <div><label className={LABEL_CLASS}>電話</label><input className={INPUT_CLASS} value={clientInfo.phone} onChange={e => setClientInfo({...clientInfo, phone: e.target.value})} /></div>
+                        <div className="md:col-span-2"><label className={LABEL_CLASS}>電子信箱</label><input className={INPUT_CLASS} value={clientInfo.email} onChange={e => setClientInfo({...clientInfo, email: e.target.value})} /></div>
                     </div>
                 </section>
             </div>
-            <div className="space-y-6 print:hidden">
-                {items.map((item, idx) => (
-                    <div key={item.id} className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative">
-                            <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-blue-800 flex items-center">
-                                <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
-                            </h3>
-                            {items.length > 1 && (
-                                <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 className="w-5 h-5"/></button>
-                            )}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label className={LABEL_CLASS}>課程系列</label>
-                                <select className={INPUT_CLASS} value={item.courseSeries} onChange={e => updateItem(idx, 'courseSeries', e.target.value)}>
-                                    {Object.keys(COURSE_DATA).map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className={LABEL_CLASS}>課程名稱 (單價: ${item.price})</label>
-                                <select className={INPUT_CLASS} value={item.courseName} onChange={e => updateItem(idx, 'courseName', e.target.value)}>
-                                    {COURSE_DATA[item.courseSeries]?.map(c => <option key={c.name} value={c.name}>{c.name} (${c.price})</option>)}
-                                </select>
-                            </div>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+
+            {/* 新增課程表單區塊 (Pending Item) */}
+            <div className="print:hidden">
+                <section className={`${SECTION_CLASS} border-blue-300 border-2`}>
+                    <h3 className="text-lg font-bold mb-4 border-b pb-2 text-blue-800 flex items-center">
+                        <Plus className="w-5 h-5 mr-2" /> 新增課程項目
+                    </h3>
+                    
+                    {/* 課程選擇 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label className={LABEL_CLASS}>課程系列</label>
+                            <select className={INPUT_CLASS} value={pendingItem.courseSeries} onChange={e => updatePendingItem('courseSeries', e.target.value)}>
+                                {Object.keys(COURSE_DATA).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={LABEL_CLASS}>課程名稱 (單價: ${pendingItem.price})</label>
+                            <select className={INPUT_CLASS} value={pendingItem.courseName} onChange={e => updatePendingItem('courseName', e.target.value)}>
+                                {COURSE_DATA[pendingItem.courseSeries]?.map(c => <option key={c.name} value={c.name}>{c.name} (${c.price})</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* 人數時間 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div><label className={LABEL_CLASS}>人數</label><input type="number" className={INPUT_CLASS} value={pendingItem.peopleCount} onChange={e => updatePendingItem('peopleCount', e.target.value)} /></div>
+                        <div><label className={LABEL_CLASS}>日期</label><input type="date" className={INPUT_CLASS} value={pendingItem.eventDate} onChange={e => updatePendingItem('eventDate', e.target.value)} /></div>
+                        <div><label className={LABEL_CLASS}>時間</label><input type="time" className={INPUT_CLASS} value={pendingItem.eventTime} onChange={e => updatePendingItem('eventTime', e.target.value)} /></div>
+                        <div className="flex items-center pt-6">
+                            <label className="flex items-center cursor-pointer select-none"><input type="checkbox" className="mr-2 w-4 h-4" checked={pendingItem.hasInvoice} onChange={e => updatePendingItem('hasInvoice', e.target.checked)} /> 開立發票(5%)</label>
+                        </div>
+                    </div>
+
+                    {/* 地點模式 */}
+                    <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
+                        <div className="flex gap-6 mb-4">
+                            <label className="flex items-center cursor-pointer font-bold"><input type="radio" className="mr-2" checked={pendingItem.locationMode === 'outing'} onChange={() => updatePendingItem('locationMode', 'outing')} /> 外派教學</label>
+                            <label className="flex items-center cursor-pointer font-bold"><input type="radio" className="mr-2" checked={pendingItem.locationMode === 'store'} onChange={() => { updatePendingItem('locationMode', 'store'); updatePendingItem('city', ''); updatePendingItem('area', '');}} /> 店內包班</label>
+                        </div>
+                        {pendingItem.locationMode === 'outing' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <label className={LABEL_CLASS}>人數</label>
-                                    <input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={e => updateItem(idx, 'peopleCount', e.target.value)} />
+                                    <label className={LABEL_CLASS}>區域</label>
+                                    <select className={INPUT_CLASS} value={pendingItem.outingRegion} onChange={e => updatePendingItem('outingRegion', e.target.value)}>
+                                        <option value="North">北部出課</option><option value="Central">中部老師</option><option value="South">南部老師</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className={LABEL_CLASS}>日期</label>
-                                    <input type="date" className={INPUT_CLASS} value={item.eventDate} onChange={e => updateItem(idx, 'eventDate', e.target.value)} />
+                                    <label className={LABEL_CLASS}>縣市</label>
+                                    <select className={INPUT_CLASS} value={pendingItem.city} onChange={e => updatePendingItem('city', e.target.value)}>
+                                        {getAvailableCities(pendingItem.outingRegion).map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
                                 </div>
-                                <div>
-                                    <label className={LABEL_CLASS}>時間 (24h)</label>
-                                    <input type="time" className={INPUT_CLASS} value={item.eventTime} onChange={e => updateItem(idx, 'eventTime', e.target.value)} />
-                                </div>
-                                <div className="flex items-center pt-6">
-                                    <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 w-full">
-                                        <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={e => updateItem(idx, 'hasInvoice', e.target.checked)} />
-                                        <span className="text-sm font-medium text-gray-700">是否開立發票? (5%)</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
-                                <div className="flex gap-6 mb-4">
-                                    <label className="flex items-center cursor-pointer font-bold text-gray-700">
-                                        <input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} />
-                                        外派教學
-                                    </label>
-                                    <label className="flex items-center cursor-pointer font-bold text-gray-700">
-                                        <input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => { updateItem(idx, 'locationMode', 'store'); updateItem(idx, 'city', ''); updateItem(idx, 'area', '');}} />
-                                        店內包班
-                                    </label>
-                                </div>
-                                {item.locationMode === 'outing' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {TRANSPORT_FEES[pendingItem.city]?.zones && (
                                     <div>
-                                        <label className={LABEL_CLASS}>車馬費計算區域</label>
-                                        <select className={INPUT_CLASS} value={item.outingRegion} onChange={e => updateItem(idx, 'outingRegion', e.target.value)}>
-                                            <option value="North">北部出課</option>
-                                            <option value="Central">中部老師出課</option>
-                                            <option value="South">南部老師出課</option>
+                                        <label className={LABEL_CLASS}>行政區 ({pendingCalc.transportFee > 0 ? `+$${pendingCalc.transportFee}` : ''})</label>
+                                        <select className={INPUT_CLASS} value={pendingItem.area} onChange={e => updatePendingItem('area', e.target.value)}>
+                                            <option value="">選擇...</option>
+                                            {Object.entries(TRANSPORT_FEES[pendingItem.city].zones).map(([zone, fee]) => <option key={zone} value={zone}>{zone} (+${fee})</option>)}
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label className={LABEL_CLASS}>
-                                            縣市
-                                            {calculatedItems[idx].calc.transportFee > 0 && !calculatedItems[idx].area && (
-                                                <span className="text-blue-600 ml-2 font-normal text-xs bg-blue-50 px-2 py-0.5 rounded">
-                                                    預估: ${calculatedItems[idx].calc.transportFee}
-                                                </span>
-                                            )}
-                                        </label>
-                                        <select className={INPUT_CLASS} value={item.city} onChange={e => updateItem(idx, 'city', e.target.value)}>
-                                            {getAvailableCities(item.outingRegion).map(c => (
-                                                <option key={c} value={c}>{c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
-                                        <div>
-                                            <label className={LABEL_CLASS}>
-                                                選擇區域
-                                                {calculatedItems[idx].calc.transportFee > 0 && (
-                                                    <span className="text-blue-600 ml-2 font-normal text-xs bg-blue-50 px-2 py-0.5 rounded">
-                                                        +${calculatedItems[idx].calc.transportFee}
-                                                    </span>
-                                                )}
-                                            </label>
-                                            <select className={INPUT_CLASS} value={item.area} onChange={e => updateItem(idx, 'area', e.target.value)}>
-                                                <option value="">選擇區域...</option>
-                                                {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
-                                                    <option key={zone} value={zone}>{zone} (+${fee})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
-                                    <div className="md:col-span-3">
-                                        <label className={LABEL_CLASS}>詳細地址</label>
-                                        <input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address} onChange={e => updateItem(idx, 'address', e.target.value)} />
-                                    </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-4">
-                                        <div>
-                                        <label className={LABEL_CLASS}>店內區域</label>
-                                        <select className={INPUT_CLASS} value={item.regionType} onChange={e => updateItem(idx, 'regionType', e.target.value)}>
-                                            <option value="North">北部店內</option>
-                                            <option value="Central">中部店內</option>
-                                            <option value="South">南部店內</option>
-                                        </select>
-                                        </div>
                                     </div>
                                 )}
+                                <div className="md:col-span-3"><label className={LABEL_CLASS}>詳細地址</label><input className={INPUT_CLASS} value={pendingItem.address} onChange={e => updatePendingItem('address', e.target.value)} /></div>
                             </div>
-                            <div className="mb-4">
-                            <label className={LABEL_CLASS}>該堂課備註說明 (選填)</label>
-                            <input
-                                type="text"
-                                className={INPUT_CLASS}
-                                placeholder="例如: 需提前半小時進場、特殊需求..."
-                                value={item.itemNote}
-                                onChange={e => updateItem(idx, 'itemNote', e.target.value)}
-                            />
+                        ) : (
+                            <div className="flex gap-4">
+                                <div><label className={LABEL_CLASS}>店內區域</label><select className={INPUT_CLASS} value={pendingItem.regionType} onChange={e => updatePendingItem('regionType', e.target.value)}><option value="North">北部店內</option><option value="Central">中部店內</option><option value="South">南部店內</option></select></div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-red-50 p-4 rounded border border-red-100">
-                                    <label className={LABEL_CLASS + " text-red-800"}>手動折扣 (減項)</label>
-                                    <div className="flex flex-col gap-2">
-                                        <div className="relative">
-                                        <span className="absolute left-3 top-2 text-gray-500 font-bold">-</span>
-                                        <input type="number" className={INPUT_CLASS + " pl-6"} placeholder="金額" value={item.customDiscount} onChange={e => updateItem(idx, 'customDiscount', e.target.value)} />
-                                        </div>
-                                        <input type="text" className={INPUT_CLASS} placeholder="折扣說明 (如: 老客戶優惠)" value={item.customDiscountDesc || ''} onChange={e => updateItem(idx, 'customDiscountDesc', e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                                    <label className={LABEL_CLASS + " text-blue-800"}>額外加價 (加項)</label>
-                                    <div className="flex flex-col gap-2">
-                                        <div className="relative">
-                                        <span className="absolute left-3 top-2 text-gray-500 font-bold">+</span>
-                                        <input type="number" className={INPUT_CLASS + " pl-6"} placeholder="金額" value={item.extraFee} onChange={e => updateItem(idx, 'extraFee', e.target.value)} />
-                                        </div>
-                                        <input type="text" className={INPUT_CLASS} placeholder="加價說明 (如: 指定花材)" value={item.extraFeeDesc || ''} onChange={e => updateItem(idx, 'extraFeeDesc', e.target.value)} />
-                                    </div>
-                                </div>
-                            </div>
-                            {calculatedItems[idx].calc.error && (
-                                <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
-                                    <AlertCircle className="w-5 h-5 mr-2" />
-                                    <span className="font-bold">{calculatedItems[idx].calc.error}</span>
-                                </div>
-                            )}
+                        )}
                     </div>
-                ))}
-                <button onClick={addItem} className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg">
-                    <Plus className="w-6 h-6 mr-2" /> 增加更多課程
-                </button>
+
+                    {/* 加減價 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                         <div className="bg-red-50 p-2 rounded"><label className={LABEL_CLASS}>折扣</label><input type="number" className={INPUT_CLASS} value={pendingItem.customDiscount} onChange={e => updatePendingItem('customDiscount', e.target.value)} placeholder="金額" /></div>
+                         <div className="bg-blue-50 p-2 rounded"><label className={LABEL_CLASS}>加價</label><input type="number" className={INPUT_CLASS} value={pendingItem.extraFee} onChange={e => updatePendingItem('extraFee', e.target.value)} placeholder="金額" /></div>
+                    </div>
+                    
+                    {/* 備註欄位 */}
+                    <div className="mb-4">
+                        <label className={LABEL_CLASS}>該堂課備註說明 (選填)</label>
+                        <input type="text" className={INPUT_CLASS} placeholder="例如: 需提前半小時進場、特殊需求..." value={pendingItem.itemNote} onChange={e => updatePendingItem('itemNote', e.target.value)} />
+                    </div>
+
+                    {/* 預覽錯誤或金額 */}
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t">
+                        <div className="text-gray-600 font-medium">
+                            {pendingCalc.error ? (
+                                <span className="text-red-600 flex items-center"><AlertCircle className="w-5 h-5 mr-2"/> {pendingCalc.error}</span>
+                            ) : (
+                                <span>預估單項金額: <span className="text-xl font-bold text-blue-600">${pendingCalc.finalTotal.toLocaleString()}</span></span>
+                            )}
+                        </div>
+                        <button 
+                            onClick={handleAddItem}
+                            disabled={!!pendingCalc.error}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold shadow disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                        >
+                            <Plus className="w-5 h-5 mr-2"/> 加入此課程項目
+                        </button>
+                    </div>
+                </section>
             </div>
+
+            {/* 已加入列表 (Added Items) */}
+            <div className="print:hidden space-y-4">
+                <h3 className="font-bold text-gray-700">已加入的項目 ({addedItems.length})</h3>
+                {addedItems.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-100 rounded text-gray-500 border-dashed border-2">尚未加入任何課程，請填寫上方表單並點擊「加入」</div>
+                ) : (
+                    addedItems.map((item, idx) => (
+                        <div key={item.id} className="bg-white p-4 rounded shadow border-l-4 border-green-500 flex justify-between items-center">
+                            <div>
+                                <div className="font-bold text-lg">{item.courseName}</div>
+                                <div className="text-sm text-gray-500">{item.peopleCount}人 | {item.locationMode === 'outing' ? '外派' : '店內'} | {item.city} {item.area}</div>
+                                {item.calc.error && <div className="text-red-500 text-xs">{item.calc.error}</div>}
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="font-bold text-xl">${item.calc.finalTotal.toLocaleString()}</span>
+                                <button onClick={() => removeAddedItem(idx)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 className="w-5 h-5"/></button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* 其他設定 */}
             <div className="print:hidden">
                 <section className={SECTION_CLASS}>
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className={LABEL_CLASS}>狀態</label>
-                            <select className={INPUT_CLASS} value={status} onChange={e => setStatus(e.target.value)}>
-                                <option value="draft">草稿</option>
-                                <option value="pending">報價中</option>
-                                <option value="confirmed">已回簽</option>
-                                <option value="paid">已付訂</option>
-                                <option value="closed">已結案</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>付款期限</label>
-                            <input type="date" className={INPUT_CLASS} value={dueDate} onChange={e => setDueDate(e.target.value)} />
-                        </div>
-                        <div className="col-span-2">
-                            <label className={LABEL_CLASS}>內部備註</label>
-                            <textarea className={INPUT_CLASS} rows="3" placeholder="僅供內部查看..." value={adminNotes} onChange={e => setAdminNotes(e.target.value)} />
-                        </div>
+                        <div><label className={LABEL_CLASS}>狀態</label><select className={INPUT_CLASS} value={status} onChange={e => setStatus(e.target.value)}><option value="draft">草稿</option><option value="pending">報價中</option><option value="confirmed">已回簽</option><option value="paid">已付訂</option><option value="closed">已結案</option></select></div>
+                        <div><label className={LABEL_CLASS}>付款期限</label><input type="date" className={INPUT_CLASS} value={dueDate} onChange={e => setDueDate(e.target.value)} /></div>
+                        <div className="col-span-2"><label className={LABEL_CLASS}>內部備註</label><textarea className={INPUT_CLASS} rows="2" value={adminNotes} onChange={e => setAdminNotes(e.target.value)} /></div>
                     </div>
                 </section>
             </div>
+
             <div className="flex justify-end gap-4 pt-4 print:hidden">
-                <button onClick={onCancel} className="px-6 py-3 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-bold">取消</button>
-                <button onClick={handleSave} className="px-8 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow-lg flex items-center">
+                <button onClick={onCancel} className="px-6 py-3 bg-white border border-gray-300 rounded text-gray-700 font-bold">取消</button>
+                <button onClick={handleSave} className="px-8 py-3 bg-green-600 text-white rounded font-bold hover:bg-green-700 shadow-lg flex items-center">
                     <Save className="w-5 h-5 mr-2" /> 儲存報價單
                 </button>
             </div>
+
+            {/* 預覽區塊 */}
             <div className="mt-8 border-t-4 border-gray-800 pt-8 print:block">
                 <div className="flex justify-between items-center mb-6 print:hidden">
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                        <FileText className="w-6 h-6 mr-2" /> 報價單即時預覽 (Live Preview)
-                    </h2>
-                    <button onClick={handlePrint} className="bg-gray-800 text-white px-6 py-2 rounded shadow hover:bg-gray-700 flex items-center gap-2 font-bold">
-                        <Download className="w-4 h-4" /> 下載/列印 PDF
-                    </button>
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center"><FileText className="w-6 h-6 mr-2" /> 報價單即時預覽</h2>
+                    <button onClick={() => window.print()} className="bg-gray-800 text-white px-6 py-2 rounded shadow font-bold flex items-center"><Download className="w-4 h-4 mr-2" /> 下載 PDF</button>
                 </div>
-                <QuotePreview
-                    clientInfo={clientInfo}
-                    items={calculatedItems}
-                    totalAmount={totalAmount}
-                    dateStr={new Date().toLocaleDateString('zh-TW')}
-                    idStr="PREVIEW"
-                />
+                <QuotePreview clientInfo={clientInfo} items={addedItems} totalAmount={totalAmount} dateStr={new Date().toLocaleDateString('zh-TW')} idStr="PREVIEW" />
             </div>
         </div>
     );
 };
+
+const MobileNavButton = ({ tab, label, currentTab, onClick }) => (
+    <button onClick={() => onClick(tab)} className={`w-full text-left block px-3 py-2 rounded-md text-base font-medium ${currentTab === tab ? 'bg-blue-50 border-blue-500 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}>
+        {label}
+    </button>
+);
 
 const App = () => {
     const [activeTab, setActiveTab] = useState('list');
@@ -1585,137 +1489,24 @@ const App = () => {
     const [selectedQuoteForPayment, setSelectedQuoteForPayment] = useState(null);
     const [selectedQuoteForPreview, setSelectedQuoteForPreview] = useState(null);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
-    const [isCloudSaving, setIsCloudSaving] = useState(false);
-    const [gapiReady, setGapiReady] = useState(false);
-    const [isSignedIn, setIsSignedIn] = useState(false);
 
+    // === FIREBASE LISTENER (取代 localStorage) ===
     useEffect(() => {
-        const saved = localStorage.getItem('hbh_quotes');
-        if (saved) {
-            setQuotes(JSON.parse(saved));
-        }
+        // 使用 Firestore 監聽，自動同步資料
+        const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const quotesData = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setQuotes(quotesData);
+        }, (error) => {
+            console.error("Firebase Snapshot Error:", error);
+            // 避免在開發環境一直彈窗，可視情況開啟
+            // alert("讀取資料失敗，請檢查網路連線。");
+        });
+        return () => unsubscribe();
     }, []);
-
-    useEffect(() => {
-        localStorage.setItem('hbh_quotes', JSON.stringify(quotes));
-    }, [quotes]);
-
-    // Google API Initialization (Dynamic Loading)
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = "https://apis.google.com/js/api.js";
-        script.async = true;
-        script.defer = true;
-        
-        const initClient = () => {
-            window.gapi.load('client:auth2', () => {
-                window.gapi.client.init({
-                    clientId: CLIENT_ID,
-                    apiKey: API_KEY,
-                    scope: SCOPES,
-                    discoveryDocs: DISCOVERY_DOCS
-                }).then(() => {
-                    setGapiReady(true);
-                    const authInstance = window.gapi.auth2.getAuthInstance();
-                    console.log('Google API 初始化成功。');
-                    if (authInstance) {
-                        setIsSignedIn(authInstance.isSignedIn.get());
-                        authInstance.isSignedIn.listen(setIsSignedIn);
-                    }
-                }, (error) => {
-                    console.error('Error initializing Google API client:', error);
-                });
-            });
-        };
-
-        script.onload = () => {
-            if (window.gapi) {
-                initClient();
-            }
-        };
-
-        document.body.appendChild(script);
-
-        return () => {
-            document.body.removeChild(script);
-        };
-    }, []);
-
-    const saveToGoogleDrive = async () => {
-        if (!gapiReady) {
-            alert('Google API 尚未準備好，請稍候再試。');
-            return;
-        }
-
-        if (!isSignedIn) {
-            try {
-                await window.gapi.auth2.getAuthInstance().signIn();
-            } catch (error) {
-                console.error('Google 登入失敗:', error);
-                alert('您取消了登入或授權失敗，無法備份到 Google Drive。');
-                return;
-            }
-        }
-
-        setIsCloudSaving(true);
-        const authInstance = window.gapi.auth2.getAuthInstance();
-        const accessToken = authInstance.currentUser.get().getAuthResponse(true).access_token; 
-
-        const fileContent = JSON.stringify(quotes, null, 2);
-        const dateString = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const fileName = `HBH_Quotes_Backup_${dateString}.json`;
-        const file = new Blob([fileContent], { type: 'application/json' });
-        
-        let fileId = null;
-        try {
-            const response = await window.gapi.client.drive.files.list({
-                'q': `name='${fileName}' and trashed=false and mimeType='application/json'`,
-                'spaces': 'drive',
-                'fields': 'files(id, name)',
-            });
-            if (response.result.files.length > 0) {
-                fileId = response.result.files[0].id;
-            }
-        } catch (error) {
-            console.warn('無法檢查舊備份檔案，將建立新檔案。', error);
-        }
-
-        try {
-            if (fileId) {
-                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': 'Bearer ' + accessToken,
-                        'Content-Type': 'application/json'
-                    },
-                    body: file
-                });
-                alert(`備份成功！檔案已更新至 Google Drive：${fileName}`);
-            } else {
-                const metadata = {
-                    'name': fileName,
-                    'mimeType': 'application/json'
-                };
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', file);
-                
-                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + accessToken,
-                    },
-                    body: form
-                });
-                alert(`備份成功！新檔案已儲存到 Google Drive：${fileName}`);
-            }
-        } catch (error) {
-            console.error('Google Drive 上傳失敗:', error);
-            alert('備份失敗：上傳時發生錯誤。請檢查您的連線。');
-        } finally {
-            setIsCloudSaving(false);
-        }
-    };
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -1732,25 +1523,61 @@ const App = () => {
         setActiveTab('create');
     };
 
-    const handleSaveQuote = (quoteData) => {
-        if (editingQuote) {
-            setQuotes(quotes.map(q => 
-                q.id === editingQuote.id ? { ...q, ...quoteData, updatedAt: new Date().toISOString() } : q
-            ));
-        } else {
-            setQuotes([...quotes, { 
-                ...quoteData, 
-                id: Date.now().toString(), 
-                createdAt: new Date().toISOString(), 
-                status: quoteData.status || 'draft' 
-            }]);
+    // === FIREBASE CRUD ===
+    const handleSaveQuote = async (quoteData) => {
+        try {
+            if (editingQuote) {
+                // Update
+                const quoteRef = doc(db, "quotes", editingQuote.id);
+                // 移除 id 因為 firestore 不存這個
+                const { id, ...dataToUpdate } = quoteData; 
+                await updateDoc(quoteRef, {
+                    ...dataToUpdate,
+                    updatedAt: new Date().toISOString()
+                });
+            } else {
+                // Create
+                await addDoc(collection(db, "quotes"), {
+                    ...quoteData,
+                    createdAt: new Date().toISOString(),
+                    status: quoteData.status || 'draft'
+                });
+            }
+            setActiveTab('list');
+        } catch (e) {
+            console.error("Error adding/updating document: ", e);
+            alert("儲存失敗: " + e.message);
         }
-        setActiveTab('list');
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (confirm("確定要刪除此報價單嗎？")) {
-            setQuotes(quotes.filter(q => q.id !== id));
+            try {
+                await deleteDoc(doc(db, "quotes", id));
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+                alert("刪除失敗");
+            }
+        }
+    };
+
+    const handleUpdatePayment = async (id, updates) => {
+        try {
+            const quoteRef = doc(db, "quotes", id);
+            await updateDoc(quoteRef, updates);
+        } catch(e) {
+            console.error(e);
+            alert("更新失敗");
+        }
+    };
+
+    const handleStatusChange = async (id, newStatus) => {
+        try {
+            const quoteRef = doc(db, "quotes", id);
+            await updateDoc(quoteRef, { status: newStatus });
+        } catch (e) {
+            console.error(e);
+            alert("狀態更新失敗");
         }
     };
 
@@ -1764,21 +1591,10 @@ const App = () => {
         setShowPreviewModal(true);
     }
 
-    const handleUpdatePayment = (id, updates) => {
-        setQuotes(quotes.map(q => q.id === id ? { ...q, ...updates } : q));
-    };
-
-    const handleStatusChange = (id, newStatus) => {
-        setQuotes(quotes.map(q => q.id === id ? { ...q, status: newStatus } : q));
-    }
-
     const exportCSV = () => {
         const headers = ["ID", "狀態", "客戶名稱", "聯絡人", "電話", "總金額", "建立日期"];
-        const rows = quotes.map(q => [
-             q.id, q.status, q.clientInfo.companyName, q.clientInfo.contactPerson, q.clientInfo.phone, q.totalAmount, formatDate(q.createdAt)
-        ]);
-        const csvContent = "data:text/csv;charset=utf-8,\uFEFF"
-             + [headers, ...rows].map(e => e.join(",")).join("\n");
+        const rows = quotes.map(q => [q.id, q.status, q.clientInfo.companyName, q.clientInfo.contactPerson, q.clientInfo.phone, q.totalAmount, formatDate(q.createdAt)]);
+        const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
         const link = document.createElement("a");
         link.setAttribute("href", encodeURI(csvContent));
         link.setAttribute("download", "quotes_report.csv");
@@ -1787,96 +1603,39 @@ const App = () => {
         link.remove();
     };
 
-    const exportJSON = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(quotes));
-        const link = document.createElement('a');
-        link.setAttribute("href", dataStr);
-        link.setAttribute("download", "quotes_backup_" + new Date().toISOString().slice(0,10) + ".json");
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-    };
-
-    const importJSON = (event) => {
-        const fileObj = event.target.files[0];
-        if (!fileObj) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-             try {
-                 const json = JSON.parse(e.target.result);
-                 if (Array.isArray(json)) {
-                     setQuotes(json);
-                     alert("資料還原成功！已載入 " + json.length + " 筆報價單。");
-                 } else {
-                     alert("檔案格式錯誤：請確認上傳的是正確的備份檔 (JSON)");
-                 }
-             } catch (error) {
-                 alert("無法讀取檔案：" + error);
-             }
-             event.target.value = null;
-        };
-        reader.readAsText(fileObj);
-    };
-
     return (
         <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col">
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm print:hidden">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm print:hidden">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         <div className="flex items-center">
-                            <div className="flex-shrink-0 flex items-center">
-                                <div className="bg-slate-800 text-white p-2 rounded mr-2">
-                                    <FileText className="w-6 h-6" />
-                                </div>
-                                <span className="font-bold text-xl text-gray-800 tracking-wide">下班隨手作報價管理系統</span>
-                            </div>
+                            <div className="bg-slate-800 text-white p-2 rounded mr-2"><FileText className="w-6 h-6" /></div>
+                            <span className="font-bold text-xl text-gray-800 tracking-wide">下班隨手作報價系統 (雲端版)</span>
                         </div>
                         <div className="hidden md:flex items-center space-x-4">
-                            <button
-                                onClick={handleCreateNew}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                報價計算
-                            </button>
-                            <button
-                                onClick={() => handleTabChange('list')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                追蹤清單
-                            </button>
-                            <button
-                                onClick={() => handleTabChange('calendar')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                行事曆
-                            </button>
-                            <button
-                                onClick={() => handleTabChange('stats')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
-                                業績統計
-                            </button>
+                            <button onClick={handleCreateNew} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>報價計算</button>
+                            <button onClick={() => handleTabChange('list')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>追蹤清單</button>
+                            <button onClick={() => handleTabChange('calendar')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>行事曆</button>
+                            <button onClick={() => handleTabChange('stats')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>業績統計</button>
                         </div>
                         <div className="flex items-center md:hidden">
-                            <button 
-                                onClick={() => setShowMobileMenu(!showMobileMenu)} 
-                                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-                            >
+                            <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
                                 {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                             </button>
                         </div>
                     </div>
-                    {showMobileMenu && (
-                        <div className="md:hidden bg-white border-t border-gray-200">
-                            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                                <MobileNavButton tab="create" label="報價計算" currentTab={activeTab} onClick={handleTabChange} />
-                                <MobileNavButton tab="list" label="追蹤清單" currentTab={activeTab} onClick={handleTabChange} />
-                                <MobileNavButton tab="calendar" label="行事曆" currentTab={activeTab} onClick={handleTabChange} />
-                                <MobileNavButton tab="stats" label="業績統計" currentTab={activeTab} onClick={handleTabChange} />
-                            </div>
-                        </div>
-                    )}
                 </div>
+                {/* 手機選單修復：加入 absolute top-16 left-0 z-50 bg-white shadow-lg */}
+                {showMobileMenu && (
+                    <div className="md:hidden absolute top-16 left-0 w-full bg-white z-50 border-t border-gray-200 shadow-xl">
+                        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                            <MobileNavButton tab="create" label="報價計算" currentTab={activeTab} onClick={handleTabChange} />
+                            <MobileNavButton tab="list" label="追蹤清單" currentTab={activeTab} onClick={handleTabChange} />
+                            <MobileNavButton tab="calendar" label="行事曆" currentTab={activeTab} onClick={handleTabChange} />
+                            <MobileNavButton tab="stats" label="業績統計" currentTab={activeTab} onClick={handleTabChange} />
+                        </div>
+                    </div>
+                )}
             </header>
 
             <main className="flex-1 overflow-auto bg-gray-50 print:bg-white print:p-0 print:overflow-visible">
@@ -1891,10 +1650,6 @@ const App = () => {
                             onStatusChange={handleStatusChange}
                             onExport={exportCSV}
                             onCreate={handleCreateNew}
-                            onImportBackup={importJSON}
-                            onExportBackup={exportJSON}
-                            onCloudSave={saveToGoogleDrive}
-                            isCloudSaving={isCloudSaving}
                         />
                     </div>
                 )}
@@ -1905,42 +1660,14 @@ const App = () => {
                         onCancel={() => setActiveTab('list')}
                     />
                 )}
-                {activeTab === 'stats' && (
-                    <StatsView quotes={quotes} />
-                )}
-                {activeTab === 'calendar' && (
-                    <CalendarView quotes={quotes} />
-                )}
+                {activeTab === 'stats' && <StatsView quotes={quotes} />}
+                {activeTab === 'calendar' && <CalendarView quotes={quotes} />}
             </main>
 
-            {showPaymentModal && (
-                <PaymentModal
-                    quote={selectedQuoteForPayment}
-                    onClose={() => setShowPaymentModal(false)}
-                    onSave={handleUpdatePayment}
-                />
-            )}
-            {showPreviewModal && (
-                <PreviewModal
-                    quote={selectedQuoteForPreview}
-                    onClose={() => setShowPreviewModal(false)}
-                />
-            )}
+            {showPaymentModal && <PaymentModal quote={selectedQuoteForPayment} onClose={() => setShowPaymentModal(false)} onSave={handleUpdatePayment} />}
+            {showPreviewModal && <PreviewModal quote={selectedQuoteForPreview} onClose={() => setShowPreviewModal(false)} />}
         </div>
     );
 };
-
-const MobileNavButton = ({ tab, label, currentTab, onClick }) => (
-    <button
-        onClick={() => onClick(tab)}
-        className={`w-full text-left block px-3 py-2 rounded-md text-base font-medium ${
-            currentTab === tab
-                ? 'bg-blue-50 border-blue-500 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-50 hover:border-gray-300'
-        }`}
-    >
-        {label}
-    </button>
-);
 
 export default App;
