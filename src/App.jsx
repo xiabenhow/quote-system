@@ -18,13 +18,13 @@ import {
 
 // === FIREBASE CONFIGURATION ===
 const firebaseConfig = {
-  apiKey: "AIzaSyChK75njpy0zmk3wPfq0vnlORfTVFPkxAo",
-  authDomain: "xiabenhow-quote.firebaseapp.com",
-  projectId: "xiabenhow-quote",
-  storageBucket: "xiabenhow-quote.firebasestorage.app",
-  messagingSenderId: "572897867092",
-  appId: "1:572897867092:web:0be379e659e1a0613544c1",
-  measurementId: "G-H4CTY88LLF"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
