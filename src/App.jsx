@@ -16,7 +16,7 @@ import {
   orderBy 
 } from "firebase/firestore";
 
-// === FIREBASE CONFIGURATION (User Provided) ===
+// === FIREBASE CONFIGURATION ===
 const firebaseConfig = {
   apiKey: "AIzaSyChK75njpy0zmk3wPfq0vnlORfTVFPkxAo",
   authDomain: "xiabenhow-quote.firebaseapp.com",
@@ -32,18 +32,12 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const db = getFirestore(app);
 
-// === GOOGLE API CONFIG (保留備份功能選項) ===
-const CLIENT_ID = '403492971010-sql8j512te6mftdbcuqrigvgqh4fuvnn.apps.googleusercontent.com';
-const API_KEY = null;
-const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
 // --- STYLES ---
 const INPUT_CLASS = "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white";
 const LABEL_CLASS = "block text-sm font-bold text-gray-700 mb-1";
 const SECTION_CLASS = "bg-white p-6 rounded-lg shadow-sm border border-gray-200";
 
-// --- DATA MODELS (與規格書一致) ---
+// --- DATA MODELS ---
 const COURSE_DATA = {
     "水晶系列": [
         { name: "手作輕寶石水晶手鍊", price: 980 },
